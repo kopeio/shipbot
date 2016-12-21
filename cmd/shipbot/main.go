@@ -177,6 +177,8 @@ func (sb *Shipbot) syncAsset(release *github.RepositoryRelease, assetMapping *As
 
 	existing := assets[assetMapping.GithubName]
 	if existing != nil {
+		// TODO: Fetch asset to see if we can get the SHA (maybe an etag?)
+
 		if int64(iv(existing.Size)) != srcStat.Size() {
 			// TODO: Support force-replace mode?
 			return fmt.Errorf("asset %q size did not match", assetMapping.GithubName)
