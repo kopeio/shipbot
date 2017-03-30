@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/google/go-github/github"
 	"io/ioutil"
@@ -30,35 +31,56 @@ import (
 )
 
 var (
-	tag = "v1.4.4"
+	tag = ""
 
 	credentialsFile = path.Join(os.Getenv("HOME"), ".shipbot/github_token")
-	builddir        = path.Join(os.Getenv("HOME"), "release/src/k8s.io/kops")
+	//builddir        = path.Join(os.Getenv("HOME"), "release/src/k8s.io/kops")
 )
 
-type AssetMapping struct {
-	Source     string
-	GithubName string
+type Config struct {
+	Owner string `json:"owner"`
+	Repo  string `json:"repo"`
+
+	Assets []AssetMapping `json:"assets"`
 }
 
-var assetMappings = []*AssetMapping{
-	{
-		Source:     path.Join(builddir, ".build/dist/darwin/amd64/kops"),
-		GithubName: "kops-darwin-amd64",
-	},
-	{
-		Source:     path.Join(builddir, ".build/dist/linux/amd64/kops"),
-		GithubName: "kops-linux-amd64",
-	},
+type AssetMapping struct {
+	Source     string `json:"source"`
+	GithubName string `json:"githubName"`
 }
 
 func main() {
+	flag.StringVar(&tag, "tag", "", "tag to push as release")
+	configFile := ""
+	flag.StringVar(&configFile, "config", "", "confg file to use")
+	buildDir, err := os.Getwd()
+	if err != nil {
+		glog.Fatalf("error getting current directory: %v", err)
+	}
+	flag.StringVar(&buildDir, "builddir", buildDir, "directory in which we have built code (default current directory)")
 	flag.Set("logtostderr", "true")
 	flag.Parse()
 
+	if tag == "" {
+		glog.Fatalf("must specify -tag")
+	}
+
+	if configFile == "" {
+		glog.Fatalf("must specify -config")
+	}
+
+	configBytes, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		glog.Fatalf("error reading config file %q: %v", configFile, err)
+	}
+
+	config := &Config{}
+	if err := yaml.Unmarshal(configBytes, config); err != nil {
+		glog.Fatalf("error parsing config file %q: %v", configFile, err)
+	}
+
 	shipbot := &Shipbot{
-		Owner: "kubernetes",
-		Repo:  "kops",
+		Config: config,
 	}
 
 	{
@@ -84,27 +106,26 @@ func main() {
 		shipbot.Client = github.NewClient(basicAuthTransport.Client())
 	}
 
-	err := shipbot.DoRelease()
-	if err != nil {
+	if err := shipbot.DoRelease(buildDir); err != nil {
 		glog.Fatalf("unexpected error: %v", err)
 	}
 }
 
 type Shipbot struct {
 	Client *github.Client
-	Owner  string
-	Repo   string
+	Config *Config
 }
 
-func (sb *Shipbot) DoRelease() error {
-	glog.Infof("listing github releases for %s/%s", sb.Owner, sb.Repo)
-	releases, _, err := sb.Client.Repositories.ListReleases(sb.Owner, sb.Repo, &github.ListOptions{})
+func (sb *Shipbot) DoRelease(buildDir string) error {
+	glog.Infof("listing github releases for %s/%s", sb.Config.Owner, sb.Config.Repo)
+	releases, _, err := sb.Client.Repositories.ListReleases(sb.Config.Owner, sb.Config.Repo, &github.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error listing releases: %v", err)
 	}
 
 	var found *github.RepositoryRelease
-	for _, release := range releases {
+	for i := range releases {
+		release := &releases[i]
 		if sv(release.TagName) == tag {
 			glog.Infof("found release: %v", sv(release.TagName))
 			found = release
@@ -112,7 +133,7 @@ func (sb *Shipbot) DoRelease() error {
 	}
 
 	if found == nil {
-		commitSha, err := findCommitSha(builddir, tag)
+		commitSha, err := findCommitSha(buildDir, tag)
 		if err != nil {
 			return fmt.Errorf("cannot find sha for tag %q: %v", tag, err)
 		}
@@ -125,25 +146,27 @@ func (sb *Shipbot) DoRelease() error {
 			Draft:           b(true),
 		}
 
-		glog.Infof("creating github release for %s/%s/%s", sb.Owner, sb.Repo, tag)
-		found, _, err = sb.Client.Repositories.CreateRelease(sb.Owner, sb.Repo, release)
+		glog.Infof("creating github release for %s/%s/%s", sb.Config.Owner, sb.Config.Repo, tag)
+		found, _, err = sb.Client.Repositories.CreateRelease(sb.Config.Owner, sb.Config.Repo, release)
 		if err != nil {
 			return fmt.Errorf("error creating release: %v", err)
 		}
 	}
 
-	glog.Infof("listing github release assets for %s/%s/%s", sb.Owner, sb.Repo, tag)
-	assets, _, err := sb.Client.Repositories.ListReleaseAssets(sb.Owner, sb.Repo, iv(found.ID), &github.ListOptions{})
+	glog.Infof("listing github release assets for %s/%s/%s", sb.Config.Owner, sb.Config.Repo, tag)
+	assets, _, err := sb.Client.Repositories.ListReleaseAssets(sb.Config.Owner, sb.Config.Repo, iv(found.ID), &github.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error listing assets: %v", err)
 	}
 
 	assetMap := make(map[string]*github.ReleaseAsset)
-	for _, asset := range assets {
+	for i := range assets {
+		asset := &assets[i]
 		assetMap[sv(asset.Name)] = asset
 	}
 
-	for _, assetMapping := range assetMappings {
+	for i := range sb.Config.Assets {
+		assetMapping := &sb.Config.Assets[i]
 		err := sb.syncAsset(found, assetMapping, assetMap)
 		if err != nil {
 			return err
@@ -198,8 +221,8 @@ func (sb *Shipbot) syncAsset(release *github.RepositoryRelease, assetMapping *As
 		Name: assetMapping.GithubName,
 	}
 
-	glog.Infof("creating github release assets for %s/%s/%s %q", sb.Owner, sb.Repo, tag, assetMapping.GithubName)
-	asset, _, err := sb.Client.Repositories.UploadReleaseAsset(sb.Owner, sb.Repo, iv(release.ID), uploadOptions, f)
+	glog.Infof("creating github release assets for %s/%s/%s %q", sb.Config.Owner, sb.Config.Repo, tag, assetMapping.GithubName)
+	asset, _, err := sb.Client.Repositories.UploadReleaseAsset(sb.Config.Owner, sb.Config.Repo, iv(release.ID), uploadOptions, f)
 	if err != nil {
 		return fmt.Errorf("error uploading assets %q: %v", assetMapping.GithubName, err)
 	}
