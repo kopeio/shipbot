@@ -1,0 +1,42 @@
+{
+    "memo": "497a98338c05969f5d16d3b5ba95890c4020db61a4c3da96a2f2b5acb4d50ff3",
+    "projects": [
+        {
+            "name": "github.com/ghodss/yaml",
+            "branch": "master",
+            "revision": "04f313413ffd65ce25f2541bfd2b2ceec5c0908c",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/golang/glog",
+            "revision": "44145f04b68cf362d9c4df2182967c2275eaefed",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/google/go-github",
+            "revision": "63fbbb283ce4913a5ac1b6de7abae50dbf594a04",
+            "packages": [
+                "github"
+            ]
+        },
+        {
+            "name": "github.com/google/go-querystring",
+            "revision": "547ef5ac979778feb2f760cdb5f4eae1a2207b86",
+            "packages": [
+                "query"
+            ]
+        },
+        {
+            "name": "gopkg.in/yaml.v2",
+            "branch": "v2",
+            "revision": "a3f3340b5840cee44f372bddb5880fcbc419b46a",
+            "packages": [
+                "."
+            ]
+        }
+    ]
+}
