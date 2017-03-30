@@ -1,5 +1,6 @@
-# IntelliJ
+# IntelliJ / Gogland
 *.iml
+.idea/
 
 # Bazel
 bazel-bin
@@ -8,3 +9,5 @@ bazel-shipbot
 bazel-out
 bazel-testlogs
 
+# We don't include dependencies
+vendor/
