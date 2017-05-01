@@ -1,0 +1,5 @@
+owner: kopeio
+repo: shipbot
+assets:
+  - source: bazel-bin/cmd/shipbot/shipbot
+    githubName: shipbot
