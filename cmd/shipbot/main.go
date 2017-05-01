@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"path"
 	"strings"
+	"path/filepath"
 )
 
 var (
@@ -222,6 +223,12 @@ func (sb *Shipbot) syncAsset(release *github.RepositoryRelease, assetMapping *As
 	}
 
 	glog.Infof("creating github release assets for %s/%s/%s %q", sb.Config.Owner, sb.Config.Repo, tag, assetMapping.GithubName)
+	abs, err := filepath.Abs(assetMapping.Source)
+	if err != nil {
+		glog.V(2).Infof("error getting absolute path for %q: %v", assetMapping.Source, err)
+		abs = assetMapping.Source
+	}
+	glog.Infof("Uploading %q", abs)
 	asset, _, err := sb.Client.Repositories.UploadReleaseAsset(sb.Config.Owner, sb.Config.Repo, iv(release.ID), uploadOptions, f)
 	if err != nil {
 		return fmt.Errorf("error uploading assets %q: %v", assetMapping.GithubName, err)
