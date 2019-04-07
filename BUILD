@@ -1,7 +1,4 @@
-package(default_visibility = ["//visibility:public"])
+load("@bazel_gazelle//:def.bzl", "gazelle")
 
-licenses(["notice"])
-
-load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
-
-go_prefix("kope.io/shipbot")
+# gazelle:prefix kope.io/shipbot
+gazelle(name = "gazelle")

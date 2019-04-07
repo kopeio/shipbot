@@ -2,6 +2,9 @@
 *.iml
 .idea/
 
+# Emacs
+*~
+
 # Bazel
 bazel-bin
 bazel-genfiles
