@@ -18,17 +18,19 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
-	"github.com/google/go-github/github"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
-	"strings"
 	"path/filepath"
+	"strings"
+
+	"github.com/ghodss/yaml"
+	"github.com/golang/glog"
+	"github.com/google/go-github/github"
 )
 
 var (
@@ -61,6 +63,8 @@ func main() {
 	flag.StringVar(&buildDir, "builddir", buildDir, "directory in which we have built code (default current directory)")
 	flag.Set("logtostderr", "true")
 	flag.Parse()
+
+	ctx := context.Background()
 
 	if tag == "" {
 		glog.Fatalf("must specify -tag")
@@ -107,7 +111,7 @@ func main() {
 		shipbot.Client = github.NewClient(basicAuthTransport.Client())
 	}
 
-	if err := shipbot.DoRelease(buildDir); err != nil {
+	if err := shipbot.DoRelease(ctx, buildDir); err != nil {
 		glog.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -117,16 +121,15 @@ type Shipbot struct {
 	Config *Config
 }
 
-func (sb *Shipbot) DoRelease(buildDir string) error {
+func (sb *Shipbot) DoRelease(ctx context.Context, buildDir string) error {
 	glog.Infof("listing github releases for %s/%s", sb.Config.Owner, sb.Config.Repo)
-	releases, _, err := sb.Client.Repositories.ListReleases(sb.Config.Owner, sb.Config.Repo, &github.ListOptions{})
+	releases, _, err := sb.Client.Repositories.ListReleases(ctx, sb.Config.Owner, sb.Config.Repo, &github.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error listing releases: %v", err)
 	}
 
 	var found *github.RepositoryRelease
-	for i := range releases {
-		release := &releases[i]
+	for _, release := range releases {
 		if sv(release.TagName) == tag {
 			glog.Infof("found release: %v", sv(release.TagName))
 			found = release
@@ -148,27 +151,26 @@ func (sb *Shipbot) DoRelease(buildDir string) error {
 		}
 
 		glog.Infof("creating github release for %s/%s/%s", sb.Config.Owner, sb.Config.Repo, tag)
-		found, _, err = sb.Client.Repositories.CreateRelease(sb.Config.Owner, sb.Config.Repo, release)
+		found, _, err = sb.Client.Repositories.CreateRelease(ctx, sb.Config.Owner, sb.Config.Repo, release)
 		if err != nil {
 			return fmt.Errorf("error creating release: %v", err)
 		}
 	}
 
 	glog.Infof("listing github release assets for %s/%s/%s", sb.Config.Owner, sb.Config.Repo, tag)
-	assets, _, err := sb.Client.Repositories.ListReleaseAssets(sb.Config.Owner, sb.Config.Repo, iv(found.ID), &github.ListOptions{})
+	assets, _, err := sb.Client.Repositories.ListReleaseAssets(ctx, sb.Config.Owner, sb.Config.Repo, iv64(found.ID), &github.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error listing assets: %v", err)
 	}
 
 	assetMap := make(map[string]*github.ReleaseAsset)
-	for i := range assets {
-		asset := &assets[i]
+	for _, asset := range assets {
 		assetMap[sv(asset.Name)] = asset
 	}
 
 	for i := range sb.Config.Assets {
 		assetMapping := &sb.Config.Assets[i]
-		err := sb.syncAsset(found, assetMapping, assetMap)
+		err := sb.syncAsset(ctx, found, assetMapping, assetMap)
 		if err != nil {
 			return err
 		}
@@ -193,7 +195,7 @@ func findCommitSha(basedir string, tag string) (string, error) {
 	return sha, nil
 }
 
-func (sb *Shipbot) syncAsset(release *github.RepositoryRelease, assetMapping *AssetMapping, assets map[string]*github.ReleaseAsset) error {
+func (sb *Shipbot) syncAsset(ctx context.Context, release *github.RepositoryRelease, assetMapping *AssetMapping, assets map[string]*github.ReleaseAsset) error {
 	srcStat, err := os.Stat(assetMapping.Source)
 	if err != nil {
 		return fmt.Errorf("error doing stat %q: %v", assetMapping.Source, err)
@@ -229,7 +231,7 @@ func (sb *Shipbot) syncAsset(release *github.RepositoryRelease, assetMapping *As
 		abs = assetMapping.Source
 	}
 	glog.Infof("Uploading %q", abs)
-	asset, _, err := sb.Client.Repositories.UploadReleaseAsset(sb.Config.Owner, sb.Config.Repo, iv(release.ID), uploadOptions, f)
+	asset, _, err := sb.Client.Repositories.UploadReleaseAsset(ctx, sb.Config.Owner, sb.Config.Repo, iv64(release.ID), uploadOptions, f)
 	if err != nil {
 		return fmt.Errorf("error uploading assets %q: %v", assetMapping.GithubName, err)
 	}
@@ -246,6 +248,13 @@ func sv(v *string) string {
 }
 
 func iv(v *int) int {
+	if v == nil {
+		return 0
+	}
+	return *v
+}
+
+func iv64(v *int64) int64 {
 	if v == nil {
 		return 0
 	}
