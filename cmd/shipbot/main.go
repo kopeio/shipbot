@@ -88,8 +88,6 @@ func main() {
 		Config: config,
 	}
 
-	ctx := context.TODO()
-
 	{
 		credBytes, err := ioutil.ReadFile(credentialsFile)
 		if err != nil {
