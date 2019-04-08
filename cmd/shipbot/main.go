@@ -88,6 +88,8 @@ func main() {
 		Config: config,
 	}
 
+	ctx := context.TODO()
+
 	{
 		credBytes, err := ioutil.ReadFile(credentialsFile)
 		if err != nil {
@@ -158,7 +160,7 @@ func (sb *Shipbot) DoRelease(ctx context.Context, buildDir string) error {
 	}
 
 	glog.Infof("listing github release assets for %s/%s/%s", sb.Config.Owner, sb.Config.Repo, tag)
-	assets, _, err := sb.Client.Repositories.ListReleaseAssets(ctx, sb.Config.Owner, sb.Config.Repo, iv64(found.ID), &github.ListOptions{})
+	assets, _, err := sb.Client.Repositories.ListReleaseAssets(ctx, sb.Config.Owner, sb.Config.Repo, i64v(found.ID), &github.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("error listing assets: %v", err)
 	}
@@ -231,7 +233,7 @@ func (sb *Shipbot) syncAsset(ctx context.Context, release *github.RepositoryRele
 		abs = assetMapping.Source
 	}
 	glog.Infof("Uploading %q", abs)
-	asset, _, err := sb.Client.Repositories.UploadReleaseAsset(ctx, sb.Config.Owner, sb.Config.Repo, iv64(release.ID), uploadOptions, f)
+	asset, _, err := sb.Client.Repositories.UploadReleaseAsset(ctx, sb.Config.Owner, sb.Config.Repo, i64v(release.ID), uploadOptions, f)
 	if err != nil {
 		return fmt.Errorf("error uploading assets %q: %v", assetMapping.GithubName, err)
 	}
@@ -254,7 +256,7 @@ func iv(v *int) int {
 	return *v
 }
 
-func iv64(v *int64) int64 {
+func i64v(v *int64) int64 {
 	if v == nil {
 		return 0
 	}

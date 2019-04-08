@@ -2,7 +2,7 @@
 *.iml
 .idea/
 
-# Emacs
+# Editor temp files
 *~
 
 # Bazel
