@@ -177,6 +177,8 @@ func (b *RelnotesBuilder) BuildRelnotes(in io.Reader, out *bytes.Buffer) error {
 			picked := strings.TrimPrefix(title, "Cherry pick of #")
 			picked = strings.Split(picked, " ")[0]
 
+			picked = strings.Trim(picked, ":")
+
 			prNumber, err := strconv.Atoi(picked)
 			if err != nil {
 				return fmt.Errorf("error parsing cherry pick line %q", title)
