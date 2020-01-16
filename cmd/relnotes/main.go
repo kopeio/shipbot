@@ -173,8 +173,18 @@ func (b *RelnotesBuilder) BuildRelnotes(in io.Reader, out *bytes.Buffer) error {
 		}
 
 		title := pr.GetTitle()
-		if strings.HasPrefix(title, "Cherry pick of #") {
-			picked := strings.TrimPrefix(title, "Cherry pick of #")
+		if strings.HasPrefix(title, "Automated cherry pick of ") {
+			title = strings.Replace(title, "Automated cherry pick of", "Cherry-pick of", 1)
+		}
+		if strings.HasPrefix(title, "Cherry pick of ") {
+			title = strings.Replace(title, "Cherry pick of", "Cherry-pick of", 1)
+		}
+		if strings.HasPrefix(title, "cherrypick #") {
+			title = strings.Replace(title, "cherrypick #", "Cherry-pick of #", 1)
+		}
+
+		if strings.HasPrefix(title, "Cherry-pick of #") {
+			picked := strings.TrimPrefix(title, "Cherry-pick of #")
 			picked = strings.Split(picked, " ")[0]
 
 			picked = strings.Trim(picked, ":")
