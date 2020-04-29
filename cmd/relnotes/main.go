@@ -32,8 +32,8 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
 	"github.com/google/go-github/github"
+	"k8s.io/klog"
 )
 
 var (
@@ -47,6 +47,8 @@ type Config struct {
 }
 
 func main() {
+	klog.InitFlags(nil)
+
 	configFile := ""
 	flag.StringVar(&configFile, "config", "", "config file to use")
 	format := ""
@@ -55,17 +57,17 @@ func main() {
 	flag.Parse()
 
 	if configFile == "" {
-		glog.Fatalf("must specify -config")
+		klog.Fatalf("must specify -config")
 	}
 
 	configBytes, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		glog.Fatalf("error reading config file %q: %v", configFile, err)
+		klog.Fatalf("error reading config file %q: %v", configFile, err)
 	}
 
 	config := &Config{}
 	if err := yaml.Unmarshal(configBytes, config); err != nil {
-		glog.Fatalf("error parsing config file %q: %v", configFile, err)
+		klog.Fatalf("error parsing config file %q: %v", configFile, err)
 	}
 
 	shipbot := &RelnotesBuilder{
@@ -77,12 +79,12 @@ func main() {
 	{
 		credBytes, err := ioutil.ReadFile(credentialsFile)
 		if err != nil {
-			glog.Fatalf("error reading github token from %q: %v", credentialsFile, err)
+			klog.Fatalf("error reading github token from %q: %v", credentialsFile, err)
 		}
 		creds := strings.TrimSpace(string(credBytes))
 		tokens := strings.Split(creds, ":")
 		if len(tokens) != 2 {
-			glog.Fatalf("unexpected credentials format in %q", credentialsFile)
+			klog.Fatalf("unexpected credentials format in %q", credentialsFile)
 		}
 		basicAuthTransport := &github.BasicAuthTransport{
 			Username: tokens[0],
@@ -99,7 +101,7 @@ func main() {
 
 	var out bytes.Buffer
 	if err := shipbot.BuildRelnotes(os.Stdin, &out); err != nil {
-		glog.Fatalf("unexpected error: %v", err)
+		klog.Fatalf("unexpected error: %v", err)
 	}
 	fmt.Print(out.String())
 }
@@ -127,7 +129,7 @@ func (b *RelnotesBuilder) BuildRelnotes(in io.Reader, out *bytes.Buffer) error {
 
 		pr, err := strconv.Atoi(line)
 		if err != nil {
-			glog.Fatalf("error parsing line: %s", line)
+			klog.Fatalf("error parsing line: %s", line)
 		}
 		prs = append(prs, pr)
 	}
@@ -152,14 +154,14 @@ func (b *RelnotesBuilder) BuildRelnotes(in io.Reader, out *bytes.Buffer) error {
 		}
 
 		for _, comment := range comments {
-			glog.V(2).Infof("comment: %v", comment)
+			klog.V(2).Infof("comment: %v", comment)
 		}
 
-		//glog.Infof("PR #%d: %s", prNumber, pr.Title)
+		//klog.Infof("PR #%d: %s", prNumber, pr.Title)
 		var authors []string
 		seen := make(map[string]bool)
 		for _, commit := range commits {
-			glog.V(2).Infof("commit %s", commit)
+			klog.V(2).Infof("commit %s", commit)
 			author := commit.Author.GetLogin()
 			if author == "" {
 				continue
@@ -224,7 +226,7 @@ func (b *RelnotesBuilder) readPR(ctx context.Context, prNumber int) (*github.Pul
 				return nil, fmt.Errorf("error reading cache file %q: %v", p, err)
 			}
 		} else {
-			glog.V(2).Infof("Using cached file for %s", p)
+			klog.V(2).Infof("Using cached file for %s", p)
 			data = b
 		}
 	}
@@ -248,7 +250,7 @@ func (b *RelnotesBuilder) readPR(ctx context.Context, prNumber int) (*github.Pul
 		if err := ioutil.WriteFile(p, data, 0644); err != nil {
 			return nil, fmt.Errorf("error writing cache file %q: %v", p, err)
 		}
-		glog.V(2).Infof("Wrote cached file for %s", p)
+		klog.V(2).Infof("Wrote cached file for %s", p)
 	}
 
 	pr := new(github.PullRequest)
@@ -272,7 +274,7 @@ func (b *RelnotesBuilder) readCommits(ctx context.Context, prNumber int) ([]*git
 				return nil, fmt.Errorf("error reading cache file %q: %v", p, err)
 			}
 		} else {
-			glog.V(2).Infof("Using cached file for %s", p)
+			klog.V(2).Infof("Using cached file for %s", p)
 			data = b
 		}
 	}
@@ -320,7 +322,7 @@ func (b *RelnotesBuilder) readCommits(ctx context.Context, prNumber int) ([]*git
 		if err := ioutil.WriteFile(p, data, 0644); err != nil {
 			return nil, fmt.Errorf("error writing cache file %q: %v", p, err)
 		}
-		glog.V(2).Infof("Wrote cached file for %s", p)
+		klog.V(2).Infof("Wrote cached file for %s", p)
 	}
 
 	{
@@ -346,7 +348,7 @@ func (b *RelnotesBuilder) readIssueComments(ctx context.Context, issueNumber int
 				return nil, fmt.Errorf("error reading cache file %q: %v", p, err)
 			}
 		} else {
-			glog.V(2).Infof("Using cached file for %s", p)
+			klog.V(2).Infof("Using cached file for %s", p)
 			data = b
 		}
 	}
@@ -394,7 +396,7 @@ func (b *RelnotesBuilder) readIssueComments(ctx context.Context, issueNumber int
 		if err := ioutil.WriteFile(p, data, 0644); err != nil {
 			return nil, fmt.Errorf("error writing cache file %q: %v", p, err)
 		}
-		glog.V(2).Infof("Wrote cached file for %s", p)
+		klog.V(2).Infof("Wrote cached file for %s", p)
 	}
 
 	{
