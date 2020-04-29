@@ -31,9 +31,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ghodss/yaml"
 	"github.com/google/go-github/github"
 	"k8s.io/klog"
+	"sigs.k8s.io/yaml"
 )
 
 var (
