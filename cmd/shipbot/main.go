@@ -63,6 +63,10 @@ func main() {
 		klog.Fatalf("error getting current directory: %v", err)
 	}
 	flag.StringVar(&buildDir, "builddir", buildDir, "directory in which we have built code (default current directory)")
+
+	sourceDir := "."
+	flag.StringVar(&sourceDir, "src", sourceDir, "base directory for source artifacts")
+
 	flag.Set("logtostderr", "true")
 	flag.Parse()
 
@@ -87,7 +91,8 @@ func main() {
 	}
 
 	shipbot := &Shipbot{
-		Config: config,
+		Config:    config,
+		SourceDir: sourceDir,
 	}
 
 	{
@@ -119,8 +124,9 @@ func main() {
 }
 
 type Shipbot struct {
-	Client *github.Client
-	Config *Config
+	Client    *github.Client
+	Config    *Config
+	SourceDir string
 }
 
 func (sb *Shipbot) DoRelease(ctx context.Context, buildDir string) error {
@@ -198,9 +204,10 @@ func findCommitSha(basedir string, tag string) (string, error) {
 }
 
 func (sb *Shipbot) syncAsset(ctx context.Context, release *github.RepositoryRelease, assetMapping *AssetMapping, assets map[string]*github.ReleaseAsset) error {
-	srcStat, err := os.Stat(assetMapping.Source)
+	srcPath := filepath.Join(sb.SourceDir, assetMapping.Source)
+	srcStat, err := os.Stat(srcPath)
 	if err != nil {
-		return fmt.Errorf("error doing stat %q: %v", assetMapping.Source, err)
+		return fmt.Errorf("error doing stat %q: %v", srcPath, err)
 	}
 
 	existing := assets[assetMapping.GithubName]
@@ -216,9 +223,9 @@ func (sb *Shipbot) syncAsset(ctx context.Context, release *github.RepositoryRele
 		}
 	}
 
-	f, err := os.Open(assetMapping.Source)
+	f, err := os.Open(srcPath)
 	if err != nil {
-		return fmt.Errorf("error opening %q: %v", assetMapping.Source, err)
+		return fmt.Errorf("error opening %q: %v", srcPath, err)
 	}
 	defer f.Close()
 
@@ -227,10 +234,10 @@ func (sb *Shipbot) syncAsset(ctx context.Context, release *github.RepositoryRele
 	}
 
 	klog.Infof("creating github release assets for %s/%s/%s %q", sb.Config.Owner, sb.Config.Repo, tag, assetMapping.GithubName)
-	abs, err := filepath.Abs(assetMapping.Source)
+	abs, err := filepath.Abs(srcPath)
 	if err != nil {
-		klog.V(2).Infof("error getting absolute path for %q: %v", assetMapping.Source, err)
-		abs = assetMapping.Source
+		klog.V(2).Infof("error getting absolute path for %q: %v", srcPath, err)
+		abs = srcPath
 	}
 	klog.Infof("Uploading %q", abs)
 	asset, _, err := sb.Client.Repositories.UploadReleaseAsset(ctx, sb.Config.Owner, sb.Config.Repo, i64v(release.ID), uploadOptions, f)
